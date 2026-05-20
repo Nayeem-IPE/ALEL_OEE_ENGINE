@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ALEL Injection Molding OEE Engine</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(15, 23, 42, 0.08);
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(15, 23, 42, 0.06);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .glass-card:hover {
+            transform: translateY(-4px);
+            background: rgba(255, 255, 255, 0.95);
+            border-color: rgba(99, 102, 241, 0.3);
+            box-shadow: 0 10px 25px -5px rgba(99, 102, 241, 0.08), 0 8px 10px -6px rgba(99, 102, 241, 0.08);
+        }
+        .glass-input {
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(15, 23, 42, 0.12);
+        }
+        .glass-input:focus {
+            border-color: rgba(99, 102, 241, 0.5);
+            box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
+        }
+        /* Custom scrollbars for data tables */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.02); }
+        ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.2); }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 text-slate-800 font-sans min-h-screen relative overflow-x-hidden selection:bg-indigo-500/20 selection:text-indigo-900">
+
+    <div class="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
+        <div class="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] bg-indigo-400/10 rounded-full blur-[120px]"></div>
+        <div class="absolute bottom-[10%] right-[-10%] w-[45vw] h-[45vw] bg-emerald-400/5 rounded-full blur-[120px]"></div>
+    </div>
+
+    <header class="bg-white/60 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div class="flex items-center space-x-3.5">
+                <div class="bg-gradient-to-tr from-indigo-600 to-violet-500 p-2.5 rounded-xl shadow-lg shadow-indigo-500/20">
+                    <i class="fa-solid px-0.5 fa-industry text-xl text-white"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight text-slate-900">AKIJ LIGHT ENGINEERING LTD</h1>
+                    <p class="text-xs text-slate-500 font-semibold uppercase tracking-wider">Injection Molding Division — OEE Analytics Engine</p>
+                </div>
+            </div>
+            <div>
+                <span id="loadingStatus" class="inline-flex items-center bg-indigo-50 text-indigo-700 px-4 py-1.5 rounded-full border border-indigo-100 text-xs font-semibold shadow-inner">
+                    <i class="fa-solid fa-spinner fa-spin mr-2"></i> Syncing Production Pipeline...
+                </span>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 py-8 space-y-6">
+
+        <section class="glass-panel rounded-2xl p-5 shadow-sm">
+            <div class="flex items-center space-x-2 mb-4 text-indigo-600 font-bold text-xs uppercase tracking-widest">
+                <i class="fa-solid fa-sliders text-sm"></i>
+                <span>Operational Control Center</span>
+            </div>
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Year</label>
+                    <select id="filterYear" class="w-full text-xs glass-input rounded-xl p-2.5 text-slate-700 outline-none transition duration-150 cursor-pointer">
+                        <option value="All">All Years</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Month</label>
+                    <select id="filterMonth" class="w-full text-xs glass-input rounded-xl p-2.5 text-slate-700 outline-none transition duration-150 cursor-pointer">
+                        <option value="All">All Months</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Day</label>
+                    <select id="filterDay" class="w-full text-xs glass-input rounded-xl p-2.5 text-slate-700 outline-none transition duration-150 cursor-pointer">
+                        <option value="All">All Days</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Shift</label>
+                    <select id="filterShift" class="w-full text-xs glass-input rounded-xl p-2.5 text-slate-700 outline-none transition duration-150 cursor-pointer">
+                        <option value="All">All Shifts</option>
+                    </select>
+                </div>
+                <div class="flex items-end col-span-2 md:col-span-1">
+                    <button onclick="resetFilters()" class="w-full bg-slate-200/60 hover:bg-slate-200 active:bg-slate-300 text-slate-700 text-xs font-semibold py-2.5 px-4 rounded-xl border border-slate-300/60 transition duration-150 flex items-center justify-center gap-2 shadow-sm">
+                        <i class="fa-solid fa-arrow-rotate-left opacity-70"></i> Reset Filters
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <section class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="glass-panel p-4 rounded-2xl flex items-center space-x-4 shadow-sm">
+                <div class="bg-indigo-50 p-3 rounded-xl border border-indigo-100 text-indigo-600 shadow-inner"><i class="fa-solid fa-screwdriver-wrench text-lg"></i></div>
+                <div>
+                    <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Active Machines Run</p>
+                    <h4 id="cardMachines" class="text-xl font-extrabold text-slate-900 mt-0.5 tabular-nums">0</h4>
+                </div>
+            </div>
+            <div class="glass-panel p-4 rounded-2xl flex items-center space-x-4 shadow-sm min-w-0">
+                <div class="bg-purple-50 p-3 rounded-xl border border-purple-100 text-purple-600 shadow-inner"><i class="fa-solid fa-tags text-lg"></i></div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Slicer-Filtered Product Name</p>
+                    <h4 id="cardProducts" class="text-sm font-bold text-slate-900 mt-0.5 truncate" title="No filters applied">All Products Logged</h4>
+                </div>
+            </div>
+            <div class="glass-panel p-4 rounded-2xl flex items-center space-x-4 shadow-sm">
+                <div class="bg-emerald-50 p-3 rounded-xl border border-emerald-100 text-emerald-600 shadow-inner"><i class="fa-solid fa-user-tie text-lg"></i></div>
+                <div>
+                    <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Supervisors on Duty</p>
+                    <h4 id="cardSupervisors" class="text-xl font-extrabold text-slate-900 mt-0.5 tabular-nums">0</h4>
+                </div>
+            </div>
+        </section>
+
+        <section class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="glass-card p-5 rounded-2xl flex flex-col justify-between shadow-sm">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Overall OEE</p>
+                        <h3 id="kpiOEE" class="text-2xl font-black mt-1.5 text-slate-900 tracking-tight tabular-nums">0.000%</h3>
+                    </div>
+                    <div id="badgeOEE" class="p-2.5 rounded-xl bg-slate-100 text-slate-600 border border-slate-200 shadow-inner"><i class="fa-solid fa-gauge-high text-base"></i></div>
+                </div>
+                <div class="mt-5 pt-3 border-t border-slate-100 flex items-center text-[11px] text-slate-500">
+                    <span class="font-medium mr-1.5">Target Threshold:</span> <span class="font-bold text-emerald-600">≥ 0.850%</span>
+                </div>
+            </div>
+            <div class="glass-card p-5 rounded-2xl flex flex-col justify-between shadow-sm">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Availability Pillar</p>
+                        <h3 id="kpiAvailability" class="text-2xl font-black mt-1.5 text-slate-900 tracking-tight tabular-nums">0.000%</h3>
+                    </div>
+                    <div class="p-2.5 rounded-xl bg-blue-50 text-blue-600 border border-blue-100 shadow-inner"><i class="fa-solid fa-clock text-base"></i></div>
+                </div>
+                <div class="mt-5 pt-3 border-t border-slate-100 text-[11px] text-slate-500 font-medium">
+                    Uptime Efficiency Stream
+                </div>
+            </div>
+            <div class="glass-card p-5 rounded-2xl flex flex-col justify-between shadow-sm">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Performance Pillar</p>
+                        <h3 id="kpiPerformance" class="text-2xl font-black mt-1.5 text-slate-900 tracking-tight tabular-nums">0.000%</h3>
+                    </div>
+                    <div class="p-2.5 rounded-xl bg-amber-50 text-amber-600 border border-amber-100 shadow-inner"><i class="fa-solid fa-bolt text-base"></i></div>
+                </div>
+                <div class="mt-5 pt-3 border-t border-slate-100 text-[11px] text-slate-500 font-medium">
+                    Speed and Cycle Precision
+                </div>
+            </div>
+            <div class="glass-card p-5 rounded-2xl flex flex-col justify-between shadow-sm">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Quality Pillar</p>
+                        <h3 id="kpiQuality" class="text-2xl font-black mt-1.5 text-slate-900 tracking-tight tabular-nums">0.000%</h3>
+                    </div>
+                    <div class="p-2.5 rounded-xl bg-teal-50 text-teal-600 border border-teal-100 shadow-inner"><i class="fa-solid fa-circle-check text-base"></i></div>
+                </div>
+                <div class="mt-5 pt-3 border-t border-slate-100 text-[11px] text-slate-500 font-medium">
+                    Yield / Defect Limitation
+                </div>
+            </div>
+        </section>
+
+        <section class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="bg-white/80 backdrop-blur-xl border border-slate-200 p-4 rounded-2xl flex items-center space-x-4 shadow-sm">
+                <div class="bg-indigo-50 p-3 rounded-xl text-indigo-600 border border-indigo-100 shadow-inner"><i class="fa-solid fa-boxes-stacked text-lg"></i></div>
+                <div>
+                    <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Output Volume</p>
+                    <h4 id="kpiTotalOutput" class="text-lg font-bold text-slate-900 tracking-tight mt-0.5 tabular-nums">0 <span class="text-xs text-slate-400 font-normal">Pcs</span></h4>
+                </div>
+            </div>
+            <div class="bg-white/80 backdrop-blur-xl border border-slate-200 p-4 rounded-2xl flex items-center space-x-4 shadow-sm">
+                <div class="bg-emerald-50 p-3 rounded-xl text-emerald-600 border border-emerald-100 shadow-inner"><i class="fa-solid fa-clipboard-check text-lg"></i></div>
+                <div>
+                    <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Good Yield</p>
+                    <h4 id="kpiGoodOutput" class="text-lg font-bold text-slate-900 tracking-tight mt-0.5 tabular-nums">0 <span class="text-xs text-slate-400 font-normal">Pcs</span></h4>
+                </div>
+            </div>
+            <div class="bg-white/80 backdrop-blur-xl border border-slate-200 p-4 rounded-2xl flex items-center space-x-4 shadow-sm">
+                <div class="bg-rose-50 p-3 rounded-xl text-rose-600 border border-rose-100 shadow-inner"><i class="fa-solid fa-trash-can text-lg"></i></div>
+                <div>
+                    <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Unplanned Losses (NPT)</p>
+                    <h4 id="kpiTotalDowntime" class="text-lg font-bold text-slate-900 tracking-tight mt-0.5 tabular-nums">0 <span class="text-xs text-slate-400 font-normal">Mins</span></h4>
+                </div>
+            </div>
+        </section>
+
+        <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="glass-panel p-5 rounded-2xl shadow-sm relative overflow-hidden">
+                <div class="flex justify-between items-center mb-5">
+                    <h3 class="text-xs font-bold text-slate-700 uppercase tracking-widest"><i class="fa-solid fa-chart-line mr-2 text-indigo-600"></i>OEE Monthly Comprehensive Trend</h3>
+                    <span class="text-[10px] bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded border border-indigo-100 font-semibold">Day-Slicer Disconnected</span>
+                </div>
+                <div id="trendChart" class="w-full h-80"></div>
+            </div>
+
+            <div class="glass-panel p-5 rounded-2xl shadow-sm">
+                <div class="flex justify-between items-center mb-5">
+                    <h3 class="text-xs font-bold text-slate-700 uppercase tracking-widest"><i class="fa-solid fa-chart-pie mr-2 text-purple-600"></i>Unplanned Downtime Matrix (Min)</h3>
+                </div>
+                <div id="downtimeChart" class="w-full h-80"></div>
+            </div>
+
+            <div class="glass-panel p-5 rounded-2xl shadow-sm lg:col-span-2">
+                <div class="flex justify-between items-center mb-5">
+                    <h3 class="text-xs font-bold text-slate-700 uppercase tracking-widest"><i class="fa-solid fa-chart-bar mr-2 text-emerald-600"></i>Shift Target vs Actual Output (Sorted)</h3>
+                </div>
+                <div id="productChart" class="w-full h-80"></div>
+            </div>
+        </section>
+
+        <section class="glass-panel rounded-2xl shadow-sm overflow-hidden">
+            <div class="px-5 py-4 border-b border-slate-200 bg-slate-100/50 backdrop-blur-sm flex flex-col sm:flex-row justify-between items-center gap-4">
+                <h3 class="text-xs font-bold text-slate-700 uppercase tracking-widest"><i class="fa-solid fa-table-list mr-2 text-indigo-600"></i>Filtered Production Records</h3>
+                <div class="relative w-full sm:w-64">
+                    <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400">
+                        <i class="fa-solid fa-magnifying-glass text-xs"></i>
+                    </span>
+                    <input type="text" id="tableSearch" onkeyup="searchTable()" placeholder="Search logs..." class="pl-9 pr-4 py-2 w-full text-xs text-slate-700 glass-input rounded-xl outline-none transition duration-150">
+                </div>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-50 text-slate-600 text-[11px] font-bold uppercase tracking-wider border-b border-slate-200">
+                            <th class="px-5 py-3.5">Date</th>
+                            <th class="px-5 py-3.5">Machine</th>
+                            <th class="px-5 py-3.5">Shift</th>
+                            <th class="px-5 py-3.5">Product Criteria</th>
+                            <th class="px-5 py-3.5">Supervisor</th>
+                            <th class="px-5 py-3.5 text-right">Target (Pcs)</th>
+                            <th class="px-5 py-3.5 text-right">Actual (Pcs)</th>
+                            <th class="px-5 py-3.5 text-right">Wastage (Pcs)</th>
+                            <th class="px-5 py-3.5 text-center">OEE %</th>
+                        </tr>
+                    </thead>
+                    <tbody id="productionTableBody" class="divide-y divide-slate-200 text-xs text-slate-700">
+                        </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <footer class="border-t border-slate-200 bg-white/60 backdrop-blur-md mt-16 py-6">
+        <div class="max-w-7xl mx-auto px-4 text-center text-xs text-slate-500 space-y-1.5">
+            <p>&copy; 2026 Akij Light Engineering Ltd. All rights reserved.</p>
+            <p class="font-medium tracking-wide opacity-80">Light-Theme Glassmorphism Visual Framework powered by Tailwind UI Engine & Apex Analytics Stack.</p>
+        </div>
+    </footer>
+
+    <script>
+        const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT278Z7eDyGDEydyjtAkK0xGD0Y9y5GmAw8DJcFsLyX1agdEE-UD7hQdEZZvsmkU68CuK0BOfvZi1vk/pub?gid=78827421&single=true&output=csv";
+        
+        let dashboardData = [];
+        let trendChartInstance = null;
+        let downtimeChartInstance = null;
+        let productChartInstance = null;
+
+        const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+        const lossMetrics = [
+            'Utility (Gas)', 'Utility (Electricity)', 'Unavailable Order', 
+            'Raw Material Shortage', 'Manpower Shortage', 'QCO (Quick change over)', 
+            'In Process Setup/Adjustment', 'Mechanical Breakdown', 'Electrical Breakdown', 
+            'Others down time'
+        ];
+
+        const cleanNum = val => {
+            if (!val) return 0;
+            let parsed = parseFloat(val.toString().replace(/[\s,%]/g, ''));
+            return isNaN(parsed) ? 0 : parsed;
+        };
+
+        window.addEventListener('DOMContentLoaded', () => {
+            fetchProductionData();
+        });
+
+        function fetchProductionData() {
+            const fallbackTimeout = setTimeout(() => {
+                if (dashboardData.length === 0) {
+                    document.getElementById('loadingStatus').innerHTML = `<i class="fa-solid fa-triangle-exclamation text-rose-600 mr-2"></i> Connection Timeout - Check Link`;
+                    document.getElementById('loadingStatus').className = "inline-flex items-center bg-rose-50 text-rose-700 px-4 py-1.5 rounded-full border border-rose-100 text-xs font-semibold shadow-inner";
+                }
+            }, 8000);
+
+            Papa.parse(csvUrl, {
+                download: true,
+                header: true,
+                skipEmptyLines: true,
+                transformHeader: h => h.trim(),
+                complete: function(results) {
+                    clearTimeout(fallbackTimeout);
+                    if (results.data && results.data.length > 0) {
+                        dashboardData = results.data.filter(row => row['Date']).map(row => {
+                            let parts = row['Date'].split('-');
+                            if(parts.length === 3) {
+                                row._year = parts[0].trim();
+                                let monthIdx = parseInt(parts[1].trim(), 10) - 1;
+                                row._month = monthNames[monthIdx] || 'Unknown';
+                                row._day = parts[2].trim().padStart(2, '0');
+                            } else {
+                                let dt = new Date(row['Date']);
+                                if (!isNaN(dt.getTime())) {
+                                    row._year = dt.getFullYear().toString();
+                                    row._month = monthNames[dt.getMonth()];
+                                    row._day = dt.getDate().toString().padStart(2, '0');
+                                }
+                            }
+                            return row;
+                        });
+
+                        document.getElementById('loadingStatus').innerHTML = `<i class="fa-solid fa-circle-check text-emerald-600 mr-2"></i> Live Feed Operational`;
+                        document.getElementById('loadingStatus').className = "inline-flex items-center bg-emerald-50 text-emerald-700 px-4 py-1.5 rounded-full border border-emerald-100 text-xs font-semibold shadow-inner";
+                        
+                        buildUnifiedDateFilters();
+                        initDashboardCharts();
+                        renderDashboard();
+                    }
+                },
+                error: function(err) {
+                    clearTimeout(fallbackTimeout);
+                    document.getElementById('loadingStatus').innerHTML = `<i class="fa-solid fa-circle-xmark text-rose-600 mr-2"></i> Feed Network Blocked`;
+                    document.getElementById('loadingStatus').className = "inline-flex items-center bg-rose-50 text-rose-700 px-4 py-1.5 rounded-full border border-rose-100 text-xs font-semibold shadow-inner";
+                }
+            });
+        }
+
+        function buildUnifiedDateFilters() {
+            const years = new Set();
+            const months = new Set();
+            const days = new Set();
+            const shifts = new Set();
+
+            dashboardData.forEach(row => {
+                if(row._year) years.add(row._year);
+                if(row._month) months.add(row._month);
+                if(row._day) days.add(row._day);
+                if(row['Shift']) shifts.add(row['Shift'].trim());
+            });
+
+            const yrSelect = document.getElementById('filterYear');
+            Array.from(years).sort().forEach(y => {
+                let opt = document.createElement('option'); opt.value = y; opt.textContent = y;
+                yrSelect.appendChild(opt);
+            });
+
+            const moSelect = document.getElementById('filterMonth');
+            monthNames.forEach(m => {
+                if(months.has(m)) {
+                    let opt = document.createElement('option'); opt.value = m; opt.textContent = m;
+                    moSelect.appendChild(opt);
+                }
+            });
+
+            const daySelect = document.getElementById('filterDay');
+            Array.from(days).sort((a,b)=>parseInt(a)-parseInt(b)).forEach(d => {
+                let opt = document.createElement('option'); opt.value = d; opt.textContent = d;
+                daySelect.appendChild(opt);
+            });
+
+            const shSelect = document.getElementById('filterShift');
+            Array.from(shifts).sort().forEach(s => {
+                let opt = document.createElement('option'); opt.value = s; opt.textContent = s;
+                shSelect.appendChild(opt);
+            });
+
+            ['filterYear', 'filterMonth', 'filterDay', 'filterShift'].forEach(id => {
+                document.getElementById(id).addEventListener('change', renderDashboard);
+            });
+        }
+
+        function resetFilters() {
+            ['filterYear', 'filterMonth', 'filterDay', 'filterShift'].forEach(id => {
+                document.getElementById(id).value = "All";
+            });
+            document.getElementById('tableSearch').value = "";
+            renderDashboard();
+        }
+
+        function renderDashboard() {
+            const fYear = document.getElementById('filterYear').value;
+            const fMonth = document.getElementById('filterMonth').value;
+            const fDay = document.getElementById('filterDay').value;
+            const fShift = document.getElementById('filterShift').value;
+
+            const filtered = dashboardData.filter(row => {
+                if (fYear !== "All" && row._year !== fYear) return false;
+                if (fMonth !== "All" && row._month !== fMonth) return false;
+                if (fDay !== "All" && row._day !== fDay) return false;
+                if (fShift !== "All" && row['Shift']?.trim() !== fShift) return false;
+                return true;
+            });
+
+            const trendFiltered = dashboardData.filter(row => {
+                if (fYear !== "All" && row._year !== fYear) return false;
+                if (fMonth !== "All" && row._month !== fMonth) return false;
+                if (fShift !== "All" && row['Shift']?.trim() !== fShift) return false;
+                return true;
+            });
+
+            updateOperationalCards(filtered);
+            calculateKPIs(filtered);
+            updateTrendChart(trendFiltered);
+            updateDowntimeChart(filtered);
+            updateProductChart(filtered);
+            populateTable(filtered);
+        }
+
+        function updateOperationalCards(records) {
+            const uniqueMachines = new Set();
+            const uniqueProducts = new Set();
+            const uniqueSupervisors = new Set();
+
+            records.forEach(row => {
+                if(row['Machine'] && row['Machine'] !== 'NaN') uniqueMachines.add(row['Machine'].trim());
+                if(row['Product Criteria']) uniqueProducts.add(row['Product Criteria'].trim());
+                if(row['Supervisor Name']) uniqueSupervisors.add(row['Supervisor Name'].trim());
+            });
+
+            document.getElementById('cardMachines').textContent = uniqueMachines.size;
+            
+            // Fixed requirement: Show the active product name(s) directly on the card with respect to slicers
+            const productCard = document.getElementById('cardProducts');
+            const productArray = Array.from(uniqueProducts);
+            
+            if (productArray.length === 0) {
+                productCard.textContent = "No Products Found";
+                productCard.title = "No products match criteria";
+            } else if (productArray.length === 1) {
+                productCard.textContent = productArray[0];
+                productCard.title = productArray[0];
+            } else {
+                productCard.textContent = `${productArray[0]} (+${productArray.length - 1} more)`;
+                productCard.title = productArray.join(', ');
+            }
+
+            document.getElementById('cardSupervisors').textContent = uniqueSupervisors.size;
+        }
+
+        function calculateKPIs(records) {
+            if(records.length === 0) {
+                ['kpiOEE', 'kpiAvailability', 'kpiPerformance', 'kpiQuality'].forEach(id => document.getElementById(id).textContent = "0.000%");
+                ['kpiTotalOutput', 'kpiGoodOutput', 'kpiTotalDowntime'].forEach(id => document.getElementById(id).innerHTML = "0");
+                return;
+            }
+
+            let sumOEE = 0, sumAvail = 0, sumPerf = 0, sumQual = 0;
+            let totalOutput = 0, totalGood = 0, totalNPT = 0;
+
+            records.forEach(row => {
+                sumOEE += cleanNum(row['OEE%']);
+                sumAvail += cleanNum(row['Availability%']);
+                sumPerf += cleanNum(row['Performance%']);
+                sumQual += cleanNum(row['Quality%']);
+
+                totalOutput += cleanNum(row['Actual Output (PCs)']);
+                totalGood += cleanNum(row['Total Good Production (Pcs)']);
+                totalNPT += cleanNum(row['Total Unplanned Time (NPT) (Min.)']);
+            });
+
+            const count = records.length;
+            const avgOEE = (sumOEE / count);
+            const avgAvail = (sumAvail / count);
+            const avgPerf = (sumPerf / count);
+            const avgQual = (sumQual / count);
+
+            document.getElementById('kpiOEE').textContent = avgOEE.toFixed(3) + "%";
+            document.getElementById('kpiAvailability').textContent = avgAvail.toFixed(3) + "%";
+            document.getElementById('kpiPerformance').textContent = avgPerf.toFixed(3) + "%";
+            document.getElementById('kpiQuality').textContent = avgQual.toFixed(3) + "%";
+
+            document.getElementById('kpiTotalOutput').innerHTML = totalOutput.toLocaleString() + ' <span class="text-[10px] text-slate-400 font-normal">Pcs</span>';
+            document.getElementById('kpiGoodOutput').innerHTML = totalGood.toLocaleString() + ' <span class="text-[10px] text-slate-400 font-normal">Pcs</span>';
+            document.getElementById('kpiTotalDowntime').innerHTML = totalNPT.toLocaleString() + ' <span class="text-[10px] text-slate-400 font-normal">Mins</span>';
+
+            const badge = document.getElementById('badgeOEE');
+            if(avgOEE >= 0.85) {
+                badge.className = "p-2.5 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 shadow-inner";
+            } else if (avgOEE >= 0.65) {
+                badge.className = "p-2.5 rounded-xl bg-amber-50 text-amber-600 border border-amber-100 shadow-inner";
+            } else {
+                badge.className = "p-2.5 rounded-xl bg-rose-50 text-rose-600 border border-rose-100 shadow-inner";
+            }
+        }
+
+        function initDashboardCharts() {
+            const trendOptions = {
+                chart: { height: 320, type: 'area', toolbar: { show: false }, fontFamily: 'inherit', background: 'transparent' },
+                theme: { mode: 'light' },
+                colors: ['#6366f1', '#3b82f6', '#f59e0b', '#14b8a6'],
+                dataLabels: { enabled: false },
+                stroke: { curve: 'smooth', width: 2.5 },
+                series: [],
+                xaxis: { categories: [], grid: { show: false }, labels: { style: { colors: '#475569' } } },
+                yaxis: { labels: { formatter: v => v.toFixed(3) + "%", style: { colors: '#475569' } } },
+                grid: { borderColor: 'rgba(15,23,42,0.05)' },
+                tooltip: { y: { formatter: v => v.toFixed(3) + "%" } },
+                legend: { labels: { colors: '#475569' } }
+            };
+            trendChartInstance = new ApexCharts(document.querySelector("#trendChart"), trendOptions);
+            trendChartInstance.render();
+
+            const downtimeOptions = {
+                chart: { height: 320, type: 'donut', fontFamily: 'inherit', background: 'transparent' },
+                theme: { mode: 'light' },
+                colors: ['#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16', '#10b981', '#06b6d4', '#3b82f6', '#6366f1', '#a855f7'],
+                labels: lossMetrics,
+                series: [],
+                legend: { position: 'bottom', fontSize: '11px', labels: { colors: '#475569' } },
+                stroke: { colors: ['#ffffff'], width: 2 },
+                plotOptions: { pie: { donut: { labels: { show: true, name: { color: '#475569' }, total: { show: true, color: '#0f172a', label: 'Total Lost', formatter: w => w.globals.seriesTotals.reduce((a,b)=>a+b,0) + ' m' } } } } }
+            };
+            downtimeChartInstance = new ApexCharts(document.querySelector("#downtimeChart"), downtimeOptions);
+            downtimeChartInstance.render();
+
+            const productOptions = {
+                chart: { height: 320, type: 'bar', toolbar: { show: false }, fontFamily: 'inherit', background: 'transparent' },
+                theme: { mode: 'light' },
+                colors: ['rgba(15,23,42,0.1)', '#6366f1'],
+                plotOptions: { bar: { horizontal: false, columnWidth: '45%', borderRadius: 4 } },
+                dataLabels: { enabled: false },
+                series: [],
+                grid: { borderColor: 'rgba(15,23,42,0.05)' },
+                xaxis: { categories: [], labels: { rotate: -15, style: { fontSize: '10px', colors: '#475569' } } },
+                yaxis: { labels: { style: { colors: '#475569' } } },
+                legend: { position: 'top', labels: { colors: '#475569' } }
+            };
+            productChartInstance = new ApexCharts(document.querySelector("#productChart"), productOptions);
+            productChartInstance.render();
+        }
+
+        function updateTrendChart(records) {
+            const dateGroups = {};
+            records.forEach(row => {
+                let d = row['Date'];
+                if(!dateGroups[d]) dateGroups[d] = { oee: 0, avail: 0, perf: 0, qual: 0, count: 0 };
+                dateGroups[d].oee += cleanNum(row['OEE%']);
+                dateGroups[d].avail += cleanNum(row['Availability%']);
+                dateGroups[d].perf += cleanNum(row['Performance%']);
+                dateGroups[d].qual += cleanNum(row['Quality%']);
+                dateGroups[d].count++;
+            });
+
+            const sortedDates = Object.keys(dateGroups).sort((a,b) => new Date(a) - new Date(b));
+            const oeeData = [], availData = [], perfData = [], qualData = [];
+
+            sortedDates.forEach(d => {
+                let g = dateGroups[d];
+                oeeData.push(+(g.oee / g.count).toFixed(3));
+                availData.push(+(g.avail / g.count).toFixed(3));
+                perfData.push(+(g.perf / g.count).toFixed(3));
+                qualData.push(+(g.qual / g.count).toFixed(3));
+            });
+
+            trendChartInstance.updateOptions({
+                xaxis: { categories: sortedDates },
+                series: [
+                    { name: 'OEE Total', data: oeeData },
+                    { name: 'Availability', data: availData },
+                    { name: 'Performance', data: perfData },
+                    { name: 'Quality', data: qualData }
+                ]
+            });
+        }
+
+        function updateDowntimeChart(records) {
+            const sums = lossMetrics.map(metric => {
+                return records.reduce((acc, row) => acc + cleanNum(row[metric]), 0);
+            });
+
+            const totalSum = sums.reduce((a,b)=>a+b, 0);
+            if(totalSum === 0) {
+                downtimeChartInstance.updateOptions({ series: [], noData: { text: 'No Downtime Registered', style: { color: '#475569' } } });
+            } else {
+                downtimeChartInstance.updateOptions({ series: sums });
+            }
+        }
+
+        function updateProductChart(records) {
+            const prodGroups = {};
+            records.forEach(row => {
+                let p = row['Product Criteria'] || 'Unknown SKU';
+                if(!prodGroups[p]) prodGroups[p] = { target: 0, actual: 0 };
+                prodGroups[p].target += cleanNum(row['Shift Target (PCs)']);
+                prodGroups[p].actual += cleanNum(row['Actual Output (PCs)']);
+            });
+
+            const products = Object.keys(prodGroups).sort((a, b) => prodGroups[b].actual - prodGroups[a].actual);
+            const targetSeries = products.map(p => prodGroups[p].target);
+            const actualSeries = products.map(p => prodGroups[p].actual);
+
+            productChartInstance.updateOptions({
+                xaxis: { categories: products },
+                series: [
+                    { name: 'Shift Targets', data: targetSeries },
+                    { name: 'Actual Yields', data: actualSeries }
+                ]
+            });
+        }
+
+        function populateTable(records) {
+            const tbody = document.getElementById('productionTableBody');
+            tbody.innerHTML = "";
+
+            if(records.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="9" class="px-5 py-8 text-center text-slate-400 font-medium"><i class="fa-solid fa-folder-open text-lg mb-2 block opacity-60"></i> No records found matching criteria.</td></tr>`;
+                return;
+            }
+
+            records.forEach(row => {
+                let oeeValRaw = cleanNum(row['OEE%']);
+                let oeeVal = oeeValRaw.toFixed(3);
+                let badgeClass = oeeValRaw >= 0.85 ? "bg-emerald-50 text-emerald-700 border-emerald-200" : oeeValRaw >= 0.65 ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-rose-50 text-rose-700 border-rose-200";
+                
+                let tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50 border-b border-slate-200 transition duration-75";
+                tr.innerHTML = `
+                    <td class="px-5 py-3.5 font-medium text-slate-800 whitespace-nowrap">${row['Date'] || '-'}</td>
+                    <td class="px-5 py-3.5 whitespace-nowrap"><span class="bg-slate-100 text-slate-700 px-2 py-0.5 rounded border border-slate-200">${row['Machine'] || 'N/A'}</span></td>
+                    <td class="px-5 py-3.5 text-slate-600">${row['Shift'] || '-'}</td>
+                    <td class="px-5 py-3.5 max-w-xs truncate font-medium text-slate-800" title="${row['Product Criteria']}">${row['Product Criteria'] || '-'}</td>
+                    <td class="px-5 py-3.5 text-slate-500">${row['Supervisor Name'] || '-'}</td>
+                    <td class="px-5 py-3.5 text-right tabular-nums text-slate-500">${cleanNum(row['Shift Target (PCs)']).toLocaleString()}</td>
+                    <td class="px-5 py-3.5 text-right font-semibold text-indigo-600 tabular-nums">${cleanNum(row['Actual Output (PCs)']).toLocaleString()}</td>
+                    <td class="px-5 py-3.5 text-right text-rose-600 tabular-nums">${cleanNum(row['Total Wastage (Pcs)']).toLocaleString()}</td>
+                    <td class="px-5 py-3.5 text-center"><span class="px-2.5 py-0.5 rounded-full font-bold border ${badgeClass}">${oeeVal}%</span></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function searchTable() {
+            let input = document.getElementById("tableSearch").value.toLowerCase();
+            let rows = document.getElementById("productionTableBody").getElementsByTagName("tr");
+            
+            for (let i = 0; i < rows.length; i++) {
+                let rowText = rows[i].textContent.toLowerCase();
+                if (rowText.includes(input) || rows[i].innerHTML.includes("colspan")) {
+                    rows[i].style.display = "";
+                } else {
+                    rows[i].style.display = "none";
+                }
+            }
+        }
+    </script>
+</body>
+</html>
